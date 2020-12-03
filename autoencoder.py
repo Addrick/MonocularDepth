@@ -49,7 +49,8 @@ model.add(Dense(21300, activation='relu'))
 model.add(Reshape((284,75,1)))
 # Compile model
 model.compile(optimizer='adam',
-              loss='binary_crossentropy')
+              loss='binary_crossentropy',
+              metrics=tf.keras.metrics.RootMeanSquaredError(name='rmse'))
 model.summary()
 
 history = model.fit(train_images, train_depths, batch_size=16, epochs=60,

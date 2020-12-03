@@ -19,7 +19,7 @@ import cv2 as cv
 import read_depth as rd
 
 # TODO: include the rest of the raw city driving scenes
-# currently uses the raw dataset for BW driving images and the annotated depth maps set under 'depth completion' on KITTI website
+# currently uses the raw dataset for BW driving images and the annotated depth maps set under 'depth ' on KITTI website
 # TODO: figure out how to use the velodyne .bin files instead of the depth completion dataset
 x_data_path = "data/bw_img/"
 y_data_path = "data/depth/"
@@ -32,7 +32,7 @@ depths = os.listdir(y_data_path)
 print(len(images))
 print(len(depths))
 
-# load images and depth maps into array
+# load images and depth maps into arrays
 for im_name in images:
     im = x_data_path + im_name
     img = cv.imread(im,cv.IMREAD_GRAYSCALE)
@@ -53,6 +53,7 @@ output_size = output_shape[0]*output_shape[1]
 training_images = (np.asarray(training_images))/255
 training_depths = np.asarray(training_depths)
 
+# Using train_test_split for early debugging; will use specific driving scenes as test set eventually
 train_images, test_images, train_depths, test_depths = train_test_split(training_images, training_depths, test_size=0.2)
 
 train_images = train_images.reshape((len(train_images),284,75,1))
