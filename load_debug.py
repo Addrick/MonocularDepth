@@ -47,10 +47,10 @@ depth_maps = np.asarray(depth_maps)
 # Using train_test_split for early debugging; will use specific driving scenes as test set eventually
 train_images, test_images, train_depths, test_depths = train_test_split(images, depth_maps, test_size=0.2)
 
-# train_images = train_images.reshape((len(train_images),284,75,1))
-# test_images = test_images.reshape((len(test_images),284,75,1))
-# train_depths = train_depths.reshape((len(train_depths),284,75,1))
-# test_depths = test_depths.reshape((len(test_depths),284,75,1))
+train_images = train_images.reshape((len(train_images),284,75,1))
+test_images = test_images.reshape((len(test_images),284,75,1))
+train_depths = train_depths.reshape((len(train_depths),284,75,1))
+test_depths = test_depths.reshape((len(test_depths),284,75,1))
 
 # Normalize pixel values to be between 0 and 1
 train_images = np.asarray(train_images)
