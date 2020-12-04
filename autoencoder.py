@@ -49,7 +49,7 @@ model.add(Dense(21300, activation='relu'))
 model.add(Reshape((284,75,1)))
 # Compile model
 model.compile(optimizer='adam',
-              loss='binary_crossentropy',
+              loss='mse',
               metrics=tf.keras.metrics.RootMeanSquaredError(name='rmse'))
 model.summary()
 
