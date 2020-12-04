@@ -1,19 +1,23 @@
 """
- Simple Autoencoder for Monocular Depth Estimation
+ Autoencoder for Monocular Depth Estimation
  @author: Adam Santos
+ TODO: Fix convergence
+ currently converges to all black output (all 0's)
+ IDEAS:
+ - current network is too small for the task? (but not enough GPU memory to run anything larger)
+ - problems from downsampling the data by 5? (not enough memory to run them at higher resolution)
+ - problems in data encoding/reading? depth png's are 16-bit
+ - problems in the encoder's layout/configuration?
+ - possible better luck with training one scene at a time sequentially instead of with train_test_split?
 """
-import os
 
-import numpy as np
 from keras.constraints import maxnorm
 from keras.models import Sequential
-from keras.layers import Dense, Conv2D, MaxPooling2D, Flatten, Dropout, Reshape, UpSampling2D, Cropping2D
+from keras.layers import Dense, Conv2D, MaxPooling2D, Flatten, Dropout, Reshape, UpSampling2D, Cropping2D, \
+    AveragePooling2D
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
-from tensorflow.keras.datasets import cifar10
 from tensorflow.python.keras.callbacks import ModelCheckpoint
 from tensorflow.python.keras.models import load_model
-import cv2 as cv
 import os
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -38,31 +42,33 @@ def load_data():
         imgs = os.listdir(depth_scene_dir)
 
         # iterate through files and append each example to img/depth arrays
-        for img in imgs:
+        for img in depths:
             impath = img_scene_dir + img
             img = cv.imread(impath, cv.IMREAD_GRAYSCALE)
             if img is not None:
                 img = cv.resize(img, dsize=(284, 75))
-                images.append(img)
+                images.append(np.asarray(img))
         for depth in depths:
             impath = depth_scene_dir + depth
             depth = cv.imread(impath, cv.IMREAD_GRAYSCALE)
             if depth is not None:
                 depth = cv.resize(depth, dsize=(284, 75))
-            depth_maps.append(depth)
+                depth_maps.append(np.asarray(depth))
 
     # Normalize image pixel values
-    images = (np.asarray(images)) / 255
+    # images = (np.asarray(images)) / 255
+    images = (np.asarray(images))
     depth_maps = np.asarray(depth_maps)
 
     # Using train_test_split for early debugging; will use specific driving scenes as test set eventually
     train_images, test_images, train_depths, test_depths = train_test_split(images, depth_maps, test_size=0.2)
 
     # Increase ndim to 4 for network
-    train_images = train_images.reshape((len(train_images), 75, 284, 1))
-    test_images = test_images.reshape((len(test_images), 75, 284, 1))
-    train_depths = train_depths.reshape((len(train_depths), 75, 284, 1))
-    test_depths = test_depths.reshape((len(test_depths), 75, 284, 1))
+    dim = train_images.shape
+    train_images = train_images.reshape((len(train_images), dim[1], dim[2], 1))
+    test_images = test_images.reshape((len(test_images), dim[1], dim[2], 1))
+    train_depths = train_depths.reshape((len(train_depths), dim[1], dim[2], 1))
+    test_depths = test_depths.reshape((len(test_depths), dim[1], dim[2], 1))
 
     # Normalize pixel values to be between 0 and 1
     train_images = np.asarray(train_images)
@@ -89,30 +95,35 @@ def train_model(train_images, train_depths, test_images, test_depths):
 
     # Create the model
     model = Sequential()
-    model.add(Conv2D(32, kernel_size=3, padding='same', activation='relu', input_shape=(75, 284, 1)))
-    # model.add(MaxPooling2D((2, 2), padding='same'))
-    model.add(Conv2D(32, kernel_size=3, padding='same', activation='relu'))
-    # model.add(MaxPooling2D((2, 2), padding='same'))
+    model.add(Conv2D(64, kernel_size=7, padding='same', activation='relu', input_shape=(75, 284, 1)))
+    model.add(MaxPooling2D((3, 3), padding='same'))
     model.add(Conv2D(64, kernel_size=3, padding='same', activation='relu'))
+    # model.add(MaxPooling2D((2, 2), padding='same'))
+    # model.add(Conv2D(64, kernel_size=3, padding='same', activation='relu'))
     # model.add(MaxPooling2D((2, 2), padding='same'))
 
-    model.add(Conv2D(64, kernel_size=3, padding='same', activation='relu'))
+    model.add(Conv2D(128, kernel_size=3, padding='same', activation='relu'))
+    model.add(Conv2D(128, kernel_size=3, padding='same', activation='relu'))
+    model.add(Conv2D(256, kernel_size=3, padding='same', activation='relu'))
+    model.add(Conv2D(256, kernel_size=3, padding='same', activation='relu'))
+
+    model.add(Conv2D(256, kernel_size=3, padding='same', activation='relu'))
     # model.add(UpSampling2D((2, 2)))
-    model.add(Conv2D(32, kernel_size=3, padding='same', activation='relu'))
+    # model.add(Conv2D(256, kernel_size=3, padding='same', activation='relu'))
     # model.add(UpSampling2D((2, 2)))
-    model.add(Conv2D(32, kernel_size=3, padding='same', activation='relu'))
-    # model.add(UpSampling2D((2, 2)))
-    model.add(Conv2D(1, kernel_size=3, activation='sigmoid', padding='same'))
-    # model.add(Cropping2D(cropping=((0, 1), (0, 0)), data_format=None))
+    # model.add(Conv2D(32, kernel_size=3, padding='same', activation='relu'))
+    model.add(UpSampling2D((3, 3)))
+    model.add(Conv2D(1, kernel_size=1, activation='relu', padding='same'))
+    model.add(Cropping2D(cropping=((0, 0), (0, 1)), data_format=None))
 
     # Compile model
-    model.compile(optimizer='adam',
+    model.compile(optimizer='adadelta',
                   loss='mse',
                   metrics=tf.keras.metrics.RootMeanSquaredError(name='rmse'))
     # model.summary()
 
     history = model.fit(train_images, train_depths, batch_size=32, epochs=5,
-                        validation_data=(test_images, test_depths))
+                        validation_data=(test_images, test_depths), verbose=2)
     return model, history
 
 def inference():
@@ -128,7 +139,7 @@ def inference():
     ax.set_title("Image Input")
     plt.imshow(test_images[0], 'gray')
     ax = plt.subplot(3,1,2)
-    ax.set_title("Image Input")
+    ax.set_title("Ground Truth Depth")
     plt.imshow(test_depths[0], 'gray')
     ax = plt.subplot(3,1,3)
     ax.set_title("Predicted Depth")
@@ -137,23 +148,26 @@ def inference():
 
 def check_data(train_images, train_depths, test_images, test_depths):
     # Plot image/depth pair
-    plt.figure()
+    plt.figure(figsize=(16,6))
     ax = plt.subplot(2,2,1)
     ax.set_title("Train Image")
-    plt.imshow(train_images[0], 'gray')
+    plt.imshow(train_images[10], 'gray')
     ax = plt.subplot(2,2,2)
     ax.set_title("Train Depth")
-    plt.imshow(train_depths[0], 'gray')
+    plt.imshow(train_depths[10], 'gray')
     ax = plt.subplot(2,2,3)
     ax.set_title("Test Image")
     plt.imshow(test_images[10], 'gray')
     ax = plt.subplot(2,2,4)
     ax.set_title("Test Depth")
-    plt.imshow(test_depths[0], 'gray')
+    plt.imshow(test_depths[10], 'gray')
     plt.show()
 
-
-# train_images, train_depths, test_images, test_depths = load_data()
-# model, history = train_model(train_images, train_depths, test_images, test_depths)
-check_data(train_images, train_depths, test_images, test_depths)
-inference()
+try:
+    model, history = train_model(train_images, train_depths, test_images, test_depths)
+    inference()
+except NameError:
+    train_images, train_depths, test_images, test_depths = load_data()
+    check_data(train_images, train_depths, test_images, test_depths)
+    model, history = train_model(train_images, train_depths, test_images, test_depths)
+    inference()
