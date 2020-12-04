@@ -78,8 +78,9 @@ def load_data():
     print("Data loaded.")
     return train_images, train_depths,test_images, test_depths
 
-
-def train_model(train_images, train_depths, test_images, test_depths):
+def train_model(train_images, train_depths, test_images, test_depths, save_best=True):
+    # Initializes GPU to allow memory growth instead of static allocation
+    # Resolves some intermittent initialization errors
     physical_devices = tf.config.list_physical_devices('GPU')
     try:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -93,6 +94,7 @@ def train_model(train_images, train_depths, test_images, test_depths):
     np.random.seed(seed)
 
     # Create the model
+    # Convolutional autoencoder to transform a grayscale image to an inferred depth map
     model = Sequential()
     model.add(Conv2D(64, kernel_size=7, padding='same', activation='relu', input_shape=(75, 284, 1)))
     model.add(MaxPooling2D((3, 3), padding='same'))
@@ -119,10 +121,17 @@ def train_model(train_images, train_depths, test_images, test_depths):
     model.compile(optimizer='adadelta',
                   loss='mse',
                   metrics=tf.keras.metrics.RootMeanSquaredError(name='rmse'))
-    # model.summary()
 
+    # Save the weights with lowest RMSE
+    callbacks_list = []
+    if save_best:
+        filepath = "best_depth_weights_last_run.hdf5"
+        checkpoint = ModelCheckpoint(filepath, monitor='val_rmse', verbose=1, save_best_only=True, mode='max')
+        callbacks_list.append(checkpoint)
+
+    # Train model
     history = model.fit(train_images, train_depths, batch_size=64, epochs=1000,
-                        validation_data=(test_images, test_depths), verbose=1)
+                        validation_data=(test_images, test_depths), verbose=1, callbacks=callbacks_list)
     return model, history
 
 def sample_inferences():
@@ -194,6 +203,22 @@ def check_data(train_images, train_depths, test_images, test_depths):
     ax.set_title("Test Depth")
     plt.imshow(test_depths[10], 'gray')
     plt.show()
+
+def load_weights():
+    # load YAML and create model
+    # yaml_file = open('model.yaml', 'r')
+    # loaded_model_yaml = yaml_file.read()
+    # yaml_file.close()
+    # loaded_model = model_from_yaml(loaded_model_yaml)
+    # load weights into new model
+    loaded_model = load_model("best_facial_classifier.hdf5")
+    print("Loaded model from disk")
+    # Compile model
+    model.compile(optimizer='adadelta',
+                  loss='mse',
+                  metrics=tf.keras.metrics.RootMeanSquaredError(name='rmse'))
+    return loaded_model
+
 
 try:
     model, history = train_model(train_images, train_depths, test_images, test_depths)
