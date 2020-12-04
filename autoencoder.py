@@ -1,14 +1,12 @@
 """
  Autoencoder for Monocular Depth Estimation
  @author: Adam Santos
- TODO: Fix convergence
- currently converges to all black output (all 0's)
+
  IDEAS:
+ - depth prediction looks very low resolution
  - current network is too small for the task? (but not enough GPU memory to run anything larger)
  - problems from downsampling the data by 5? (not enough memory to run them at higher resolution)
- - problems in data encoding/reading? depth png's are 16-bit
- - problems in the encoder's layout/configuration?
- - possible better luck with training one scene at a time sequentially instead of with train_test_split?
+ - problems in data encoding/reading? depth png's are 16-bit I just ignore that
 """
 
 from keras.constraints import maxnorm
@@ -23,6 +21,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import cv2 as cv
 import matplotlib.pyplot as plt
+import plot_history as ph
 
 
 def load_data():
@@ -122,28 +121,61 @@ def train_model(train_images, train_depths, test_images, test_depths):
                   metrics=tf.keras.metrics.RootMeanSquaredError(name='rmse'))
     # model.summary()
 
-    history = model.fit(train_images, train_depths, batch_size=32, epochs=5,
-                        validation_data=(test_images, test_depths), verbose=2)
+    history = model.fit(train_images, train_depths, batch_size=64, epochs=1000,
+                        validation_data=(test_images, test_depths), verbose=1)
     return model, history
 
-def inference():
-    # Runs prediction on the model and plots image, actual depth, and prediction
-    bw_img = test_images[0].reshape(1, 75, 284, 1)
-    pred = model.predict(bw_img)
+def sample_inferences():
+    # Runs 3 predictions on the model and plots image, actual depth, and prediction for each
+    bw_img1 = test_images[0].reshape(1, 75, 284, 1)
+    bw_img2 = test_images[10].reshape(1, 75, 284, 1)
+    bw_img3 = test_images[20].reshape(1, 75, 284, 1)
+
+    pred = model.predict(bw_img1)
     pred *= 255 / pred.max()
     pred = pred.astype(np.uint8)
     pred = pred.reshape(75,284)
 
-    plt.figure()
-    ax = plt.subplot(3,1,1)
-    ax.set_title("Image Input")
+    pred2 = model.predict(bw_img2)
+    pred2 *= 255 / pred2.max()
+    pred2 = pred2.astype(np.uint8)
+    pred2 = pred2.reshape(75,284)
+
+    pred3 = model.predict(bw_img3)
+    pred3 *= 255 / pred3.max()
+    pred3 = pred3.astype(np.uint8)
+    pred3 = pred3.reshape(75,284)
+
+    plt.figure(figsize=(16, 6))
+    ax = plt.subplot(3,3,1)
+    ax.set_title("Image Input 1")
     plt.imshow(test_images[0], 'gray')
-    ax = plt.subplot(3,1,2)
-    ax.set_title("Ground Truth Depth")
+    ax = plt.subplot(3,3,2)
+    ax.set_title("Ground Truth Depth 1")
     plt.imshow(test_depths[0], 'gray')
-    ax = plt.subplot(3,1,3)
-    ax.set_title("Predicted Depth")
+    ax = plt.subplot(3,3,3)
+    ax.set_title("Predicted Depth 1")
     plt.imshow(pred, 'gray')
+
+    ax = plt.subplot(3,3,4)
+    ax.set_title("Image Input 2")
+    plt.imshow(test_images[10], 'gray')
+    ax = plt.subplot(3,3,5)
+    ax.set_title("Ground Truth Depth 2")
+    plt.imshow(test_depths[0], 'gray')
+    ax = plt.subplot(3,3,6)
+    ax.set_title("Predicted Depth 2")
+    plt.imshow(pred2, 'gray')
+
+    ax = plt.subplot(3,3,7)
+    ax.set_title("Image Input 3")
+    plt.imshow(test_images[20], 'gray')
+    ax = plt.subplot(3,3,8)
+    ax.set_title("Ground Truth Depth 3")
+    plt.imshow(test_depths[0], 'gray')
+    ax = plt.subplot(3,3,9)
+    ax.set_title("Predicted Depth 3")
+    plt.imshow(pred3, 'gray')
     plt.show()
 
 def check_data(train_images, train_depths, test_images, test_depths):
@@ -165,9 +197,11 @@ def check_data(train_images, train_depths, test_images, test_depths):
 
 try:
     model, history = train_model(train_images, train_depths, test_images, test_depths)
-    inference()
+    sample_inferences()
 except NameError:
     train_images, train_depths, test_images, test_depths = load_data()
     check_data(train_images, train_depths, test_images, test_depths)
     model, history = train_model(train_images, train_depths, test_images, test_depths)
-    inference()
+    sample_inferences()
+    ph.plot_loss(history)
+    ph.plot_rmse(history)

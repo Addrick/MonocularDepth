@@ -5,7 +5,7 @@
 
 import matplotlib.pyplot as plt
 
-def plot_acc_loss(history):
+def plot_loss(history):
     # summarize history for accuracy
     # plt.plot(history.history['accuracy'])
     # plt.plot(history.history['val_accuracy'])
@@ -21,6 +21,15 @@ def plot_acc_loss(history):
     plt.plot(history.history['val_loss'])
     plt.title('model loss')
     plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+
+def plot_rmse(history):
+    plt.plot(history.history['rmse'])
+    plt.plot(history.history['val_rmse'])
+    plt.title('model rmse')
+    plt.ylabel('rmse')
     plt.xlabel('epoch')
     plt.legend(['train', 'test'], loc='upper left')
     plt.show()
