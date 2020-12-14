@@ -126,11 +126,11 @@ def train_model(train_images, train_depths, test_images, test_depths, save_best=
     callbacks_list = []
     if save_best:
         filepath = "best_depth_weights_last_run.hdf5"
-        checkpoint = ModelCheckpoint(filepath, monitor='val_rmse', verbose=1, save_best_only=True, mode='max')
+        checkpoint = ModelCheckpoint(filepath, monitor='val_rmse', verbose=1, save_best_only=True, mode='min')
         callbacks_list.append(checkpoint)
 
     # Train model
-    history = model.fit(train_images, train_depths, batch_size=64, epochs=1000,
+    history = model.fit(train_images, train_depths, batch_size=128, epochs=1500,
                         validation_data=(test_images, test_depths), verbose=1, callbacks=callbacks_list)
     return model, history
 
@@ -171,7 +171,7 @@ def sample_inferences():
     plt.imshow(test_images[10], 'gray')
     ax = plt.subplot(3,3,5)
     ax.set_title("Ground Truth Depth 2")
-    plt.imshow(test_depths[0], 'gray')
+    plt.imshow(test_depths[10], 'gray')
     ax = plt.subplot(3,3,6)
     ax.set_title("Predicted Depth 2")
     plt.imshow(pred2, 'gray')
@@ -181,7 +181,7 @@ def sample_inferences():
     plt.imshow(test_images[20], 'gray')
     ax = plt.subplot(3,3,8)
     ax.set_title("Ground Truth Depth 3")
-    plt.imshow(test_depths[0], 'gray')
+    plt.imshow(test_depths[20], 'gray')
     ax = plt.subplot(3,3,9)
     ax.set_title("Predicted Depth 3")
     plt.imshow(pred3, 'gray')
@@ -205,16 +205,11 @@ def check_data(train_images, train_depths, test_images, test_depths):
     plt.show()
 
 def load_weights():
-    # load YAML and create model
-    # yaml_file = open('model.yaml', 'r')
-    # loaded_model_yaml = yaml_file.read()
-    # yaml_file.close()
-    # loaded_model = model_from_yaml(loaded_model_yaml)
     # load weights into new model
-    loaded_model = load_model("best_facial_classifier.hdf5")
+    loaded_model = load_model("depth_48776_val_rmse.hdf5")
     print("Loaded model from disk")
     # Compile model
-    model.compile(optimizer='adadelta',
+    loaded_model.compile(optimizer='adadelta',
                   loss='mse',
                   metrics=tf.keras.metrics.RootMeanSquaredError(name='rmse'))
     return loaded_model
